@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="チューニング">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
+<title>チューニング</title>
+</head>
+<body>
+<style>
+:root{--bg:#0f1117;--card:#191c25;--line:#2a2f3c;--tx:#e8eaf0;--sub:#9aa1b2;--acc:#ffb020;
+  --st:#ff4040;--as:#f2d600;--ra:#18c4e0;--te:#c043d8;--su:#1fc95c;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 "Hiragino Sans","Meiryo",system-ui,sans-serif;
+  padding:env(safe-area-inset-top) 0 calc(24px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;gap:8px;padding:10px 14px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--line)}
+header h1{font-size:17px;margin:0;flex:1}
+button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
+button.pri{background:var(--acc);color:#141414;border-color:var(--acc);font-weight:700}
+button:disabled{opacity:.4}
+.icon{padding:6px 10px}
+main{padding:10px 12px;max-width:640px;margin:0 auto}
+.pick{display:grid;gap:8px;margin-bottom:10px}
+select{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%}
+.row{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px}
+.rowh{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-bottom:6px}
+.slots{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.slot{min-height:76px;padding:6px 4px;border-radius:10px;border:1px solid var(--line);border-top:4px solid var(--rc);background:#11141b;
+  display:flex;flex-direction:column;align-items:center;text-align:center;font-size:11px;line-height:1.25;gap:2px}
+.slot b{font-size:11px;color:var(--sub);font-weight:400}
+.slot .who{font-size:12px;color:var(--tx);word-break:break-all}
+.slot.empty .who{color:var(--sub)}
+.sp{display:flex;align-items:center;gap:8px;width:100%;margin-bottom:8px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);border-left:5px solid var(--rc);background:#11141b;text-align:left}
+.sp .t{flex:1;min-width:0}
+.sp .t small{display:block;color:var(--sub);font-size:11px}
+.badge{display:inline-block;font-size:10px;padding:0 5px;border-radius:6px;background:#2b3040;color:var(--tx)}
+.on{color:#58e08a}.off{color:var(--sub)}
+.tools{display:flex;gap:8px;margin:4px 0 14px}
+.tools button{flex:1}
+h2{font-size:15px;margin:16px 2px 6px}
+.res{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 12px}
+.res h3{font-size:12px;color:var(--sub);margin:10px 0 2px;font-weight:400}
+.ln{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)}
+.ln:last-child{border-bottom:0}
+.ln .v{font-weight:700;color:var(--acc);text-align:right;white-space:nowrap}
+.ln .v.sm{font-size:12px;white-space:normal}
+.note{font-size:12px;color:var(--sub);margin:12px 2px}
+.empty-msg{color:var(--sub);padding:12px 0}
+dialog{border:0;border-radius:16px 16px 0 0;padding:0;background:var(--card);color:var(--tx);width:100%;max-width:640px;
+  margin:auto auto 0;max-height:86vh}
+dialog::backdrop{background:#000a}
+.dh{position:sticky;top:0;background:var(--card);padding:12px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;z-index:1}
+.dh h3{margin:0;font-size:15px;flex:1}
+.db{padding:6px 14px 18px;overflow:auto}
+.cand{display:block;width:100%;text-align:left;margin:6px 0;padding:9px 10px;border-left:5px solid var(--rc)}
+.cand .eff{display:block;font-size:12px;color:var(--sub)}
+.cand .eff em{color:var(--acc);font-style:normal}
+.cand.cur{outline:2px solid var(--acc)}
+.cand .why{float:right;font-size:11px;color:#ff8a8a}
+.wl{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:13px}
+.wl label{display:flex;gap:6px;align-items:center;padding:4px 0}
+.wl h4{grid-column:1/-1;margin:8px 0 0;font-size:12px;color:var(--sub);font-weight:400}
+.rank{display:block;width:100%;text-align:left;margin:6px 0}
+.rank small{display:block;color:var(--sub);font-size:12px}
+input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:#11141b;color:var(--tx)}
+.lvs{display:flex;align-items:center;gap:8px;margin:8px 0}
+.err{color:#ff8a8a;font-size:13px}
+</style>
+
+<header><h1>ヒロアカUR チューニング</h1><button class="icon" id="cfgBtn" aria-label="設定">⚙</button></header>
+<main>
+  <div id="noData" hidden>
+    <p>データがまだ読み込まれていません。</p>
+    <button class="pri" id="noDataBtn">合言葉を入れて読み込む</button>
+    <p class="err" id="loadErr"></p>
+  </div>
+  <div id="app" hidden>
+    <div class="pick">
+      <select id="charSel" aria-label="キャラ"></select>
+      <select id="cosSel" aria-label="服"></select>
+    </div>
+    <div id="board"></div>
+    <div class="tools">
+      <button class="pri" id="recBtn">おすすめで埋める</button>
+      <button id="clearBtn">全部外す</button>
+    </div>
+    <h2>強くなる効果（合計）</h2>
+    <div class="res" id="res"></div>
+    <h2>スペシャル</h2>
+    <div class="res" id="spRes"></div>
+    <p class="note">数値は各枠の上限Lv（無指定3／H・V指定4）で計算。攻撃・防御・速度・リロードは掛け算、HP・GP・ジャンプなどは足し算。スペシャルはその段の5枠が全部埋まったときだけ効く。同じキャラのメモリは1着に1つまで・本人のメモリは使えない。<br>データ: jp.ultrarumble.com（<span id="ver"></span>）</p>
+  </div>
+</main>
+
+<dialog id="pickDlg"><div class="dh"><h3 id="pickTitle"></h3><button id="pickClose">閉じる</button></div><div class="db" id="pickBody"></div></dialog>
+
+<dialog id="recDlg"><div class="dh"><h3>欲しい効果を選ぶ</h3><button id="recClose">閉じる</button></div>
+  <div class="db">
+    <div class="wl" id="wantList"></div>
+    <label style="display:flex;gap:6px;margin:10px 0;font-size:13px"><input type="checkbox" id="keepMine"> 自分で付けた枠は残す</label>
+    <div class="tools"><button class="pri" id="recHere">この服で埋める</button><button id="recAll">服ごと探す</button></div>
+    <div id="rankList"></div>
+  </div>
+</dialog>
+
+<dialog id="cfg"><div class="dh"><h3>データの読み込み</h3><button id="cfgCancel">閉じる</button></div>
+  <form class="db" id="cfgForm" method="dialog">
+    <p class="note" style="margin-top:4px">非公開リポのデータを読むための合言葉（GitHubのトークン）を入れてください。この端末にだけ保存されます。</p>
+    <p>合言葉<br><input type="password" id="cfgToken" autocomplete="off"></p>
+    <p>保存先<br><input type="text" id="cfgRepo"></p>
+    <p class="err" id="cfgErr"></p>
+    <div class="tools"><button class="pri" type="submit">保存して読み込む</button></div>
+  </form>
+</dialog>
+
+<script>
+// チューニングの計算（画面に依存しない部分）。node の test_logic.cjs からも読む。
+// 数値の決まり（出典 jp.ultrarumble.com /tuning と tuning-builder の説明）
+//   通常枠の上限Lv：無指定=3、H/V指定=4
+//   重ね方：攻撃・防御・速度・リロード＝掛け算／最大HP・GP・瀕死HP・ジャンプ・PU/PC発動時間＝足し算
+//           PU/PCリロード＝それまでの値を2乗してから掛ける（Lv4×2 = 1.025²×1.025 = +7.69%）
+//   スペシャル：その行の通常枠5つが全部埋まっているときだけ効く
+//   同じキャラ（バトルスタイル違いを含む）のメモリは1着に1つまで。使っているキャラ自身のメモリは使えない
+(function (root) {
+  "use strict";
+
+  function kind(skill) {
+    const n = skill.name;
+    if (/PU\/PCリロード/.test(n)) return "pu";
+    if (/最大|ジャンプ|発動時間/.test(n)) return "add";
+    if (/防御力/.test(n)) return "def";
+    if (/リロード/.test(n)) return "reload";
+    return "mul";                    // 攻撃力・速度
+  }
+
+  // 画面での並び（攻撃 → 防御 → リロード → 移動 → その他）
+  function group(skill) {
+    const n = skill.name;
+    if (/攻撃力/.test(n) && !/防御/.test(n)) return 0;
+    if (/防御力|最大HP|最大GP|瀕死HP/.test(n)) return 1;
+    if (/リロード|発動時間/.test(n)) return 2;
+    if (/速度|ジャンプ/.test(n)) return 3;
+    return 4;
+  }
+  const GROUPS = ["攻撃", "防御・耐久", "リロード・PU", "移動", "その他"];
+
+  // 1つの枠に入るか（キャラの重複は別に見る）
+  function fits(mem, slot, charId) {
+    return mem.role === slot.role && (!slot.hv || mem.hv === slot.hv) && mem.char !== charId;
+  }
+
+  // build = { n: [10個の memId|null], s: [2個の memId|null], spLv: [lv, lv] }
+  function slotsOf(costume) {
+    const out = [];
+    costume.rows.forEach((r, ri) => r.slots.forEach((s, k) => out.push(Object.assign({ row: ri, no: ri * 5 + k + 1 }, s))));
+    return out;
+  }
+
+  function emptyBuild(costume) {
+    return { n: Array(10).fill(null), s: [null, null], spLv: costume.rows.map(r => r.sp.lv) };
+  }
+
+  // 置けるかどうか（置けない理由を返す。置けるなら ""）
+  function canPlace(D, costume, build, kindKey, idx, memId) {
+    const mem = D.memIndex[memId];
+    const slot = kindKey === "n" ? slotsOf(costume)[idx] : costume.rows[idx].sp;
+    if (!fits(mem, slot, costume.char)) {
+      if (mem.char === costume.char) return "本人のメモリ";
+      return "系統が合わない";
+    }
+    const list = build[kindKey];
+    for (let i = 0; i < list.length; i++) {
+      if (i === idx || !list[i]) continue;
+      if (D.memIndex[list[i]].char === mem.char) return "同じキャラを使用中";
+    }
+    return "";
+  }
+
+  function candidates(D, costume, build, kindKey, idx) {
+    const slot = kindKey === "n" ? slotsOf(costume)[idx] : costume.rows[idx].sp;
+    return D.memories.filter(m => fits(m, slot, costume.char))
+      .map(m => ({ mem: m, why: canPlace(D, costume, build, kindKey, idx, m.id) }));
+  }
+
+  // 合計効果
+  function totals(D, costume, build) {
+    const slots = slotsOf(costume);
+    const acc = {};
+    build.n.forEach((id, i) => {
+      if (!id) return;
+      const lv = slots[i].lv;
+      D.memIndex[id].skills.forEach(sid => {
+        const sk = D.skills[sid], v = sk.lv[lv - 1], k = kind(sk);
+        const a = acc[sid] || (acc[sid] = { skill: sk, kind: k, v: k === "add" ? 0 : 1, n: 0 });
+        if (k === "add") a.v += v;
+        else if (k === "pu") a.v = a.v * a.v * v;
+        else a.v *= v;
+        a.n++;
+      });
+    });
+    const list = Object.values(acc).map(a => Object.assign(a, { group: group(a.skill), text: show(a) }));
+    list.sort((x, y) => x.group - y.group || Number(x.skill.id.slice(1)) - Number(y.skill.id.slice(1)));
+    return list;
+  }
+
+  const pct = x => (Math.round(x * 100) / 100).toFixed(2);
+  function show(a) {
+    if (a.kind === "add") return "+" + (Math.round(a.v * 100) / 100);
+    if (a.kind === "def") return "受けるダメージ −" + pct((1 - a.v) * 100) + "%";
+    if (a.kind === "reload" || a.kind === "pu") return "速さ +" + pct((a.v - 1) * 100) + "%（待ち時間 −" + pct((1 - 1 / a.v) * 100) + "%）";
+    return "+" + pct((a.v - 1) * 100) + "%";
+  }
+
+  // スペシャル枠：発動するか・何Lvか・値
+  function specials(D, costume, build) {
+    return costume.rows.map((r, ri) => {
+      const filled = build.n.slice(ri * 5, ri * 5 + 5).filter(Boolean).length;
+      const id = build.s[ri], mem = id ? D.memIndex[id] : null;
+      const lv = Math.min(build.spLv[ri] || r.sp.lv, r.sp.lv);
+      return { row: ri, slot: r.sp, mem, lv, max: r.sp.lv, filled, active: !!mem && filled === 5,
+               value: mem ? mem.sp.lv[lv - 1] : null };
+    });
+  }
+
+  // ---------------- おすすめ（欲しい効果を最大にする割り当て） ----------------
+  // 値は効果1つにつき「%」に直して重みを掛けた和。足し算系は 1点 = scale[sid] %（HP/GP 1点 ≒ 0.4%）として扱う。
+  function gain(sk, lv) {
+    const v = sk.lv[lv - 1], k = kind(sk);
+    if (k === "def") return (1 - v) * 100;
+    if (k === "add") {
+      if (/最大HP|最大GP/.test(sk.name)) return v * 0.4;         // 1点 ≒ HP250〜300 の 0.4%
+      if (/瀕死HP/.test(sk.name)) return v * 0.1;
+      if (/ジャンプ/.test(sk.name)) return v * 0.15;              // Lv4 20 → 3（速度Lv4 と同じくらい）
+      return v * 2.5;                                             // PU/PC発動時間 Lv4 1.0 → 2.5
+    }
+    return (v - 1) * 100;
+  }
+
+  // want = { skillId: 重み }。重みの無い効果も 0.001 だけ数える（同点のとき何か役に立つ方を選ぶ）
+  function memValue(D, mem, lv, want) {
+    let s = 0;
+    mem.skills.forEach(sid => { s += gain(D.skills[sid], lv) * ((want[sid] || 0) + 0.001); });
+    return s;
+  }
+
+  // ハンガリアン法（行 ≤ 列、コスト最小）。cost[i][j]。戻り値 a[i] = 列番号
+  function hungarian(cost) {
+    const n = cost.length, m = cost[0].length, INF = 1e18;
+    const u = new Float64Array(n + 1), v = new Float64Array(m + 1), p = new Int32Array(m + 1), way = new Int32Array(m + 1);
+    for (let i = 1; i <= n; i++) {
+      p[0] = i; let j0 = 0;
+      const minv = new Float64Array(m + 1).fill(INF), used = new Uint8Array(m + 1);
+      do {
+        used[j0] = 1; const i0 = p[j0]; let delta = INF, j1 = 0;
+        for (let j = 1; j <= m; j++) if (!used[j]) {
+          const cur = cost[i0 - 1][j - 1] - u[i0] - v[j];
+          if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+          if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+        }
+        for (let j = 0; j <= m; j++) if (used[j]) { u[p[j]] += delta; v[j] -= delta; } else minv[j] -= delta;
+        j0 = j1;
+      } while (p[j0] !== 0);
+      do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+    }
+    const a = Array(n).fill(-1);
+    for (let j = 1; j <= m; j++) if (p[j]) a[p[j] - 1] = j - 1;
+    return a;
+  }
+
+  // keep = 固定する枠 { idx: memId }（ユーザーが自分で置いた枠を残す場合）
+  function recommend(D, costume, want, keep) {
+    keep = keep || {};
+    const slots = slotsOf(costume);
+    const usedChars = new Set(Object.values(keep).map(id => D.memIndex[id].char));
+    const chars = [...new Set(D.memories.map(m => m.char))].filter(c => c !== costume.char && !usedChars.has(c));
+    const free = slots.map((s, i) => i).filter(i => !keep[i]);
+    const build = emptyBuild(costume);
+    Object.keys(keep).forEach(i => { build.n[i] = keep[i]; });
+    if (!free.length) return { build, score: score(D, costume, build, want) };
+    // 列 = キャラ（1キャラ1枠）＋「空けておく」用のダミー列（行数ぶん）。セルの値 = そのキャラの、その枠で一番いいメモリ
+    const best = free.map(i => chars.map(c => {
+      let top = null, tv = -1;
+      D.memories.forEach(m => {
+        if (m.char !== c || !fits(m, slots[i], costume.char)) return;
+        const v = memValue(D, m, slots[i].lv, want);
+        if (v > tv) { tv = v; top = m; }
+      });
+      return top ? { id: top.id, v: tv } : null;
+    }));
+    const BIG = 1e4;                          // 枠を埋めること自体を最優先（スペシャル発動のため）
+    const cost = best.map(row => row.map(x => x ? -(BIG + x.v) : 0).concat(free.map(() => 0)));
+    const a = hungarian(cost);
+    free.forEach((slotIdx, r) => { const x = best[r][a[r]]; if (a[r] < chars.length && x) build.n[slotIdx] = x.id; });
+    return { build, score: score(D, costume, build, want) };
+  }
+
+  function score(D, costume, build, want) {
+    const slots = slotsOf(costume);
+    let s = 0;
+    build.n.forEach((id, i) => { if (id) s += memValue(D, D.memIndex[id], slots[i].lv, want); });
+    return s;
+  }
+
+  // 服ごとにおすすめを作って、欲しい効果の値が大きい順に並べる
+  function rankCostumes(D, charId, want) {
+    return D.costumes.filter(c => c.char === charId).map(c => {
+      const r = recommend(D, c, want);
+      return { costume: c, build: r.build, score: r.score };
+    }).sort((a, b) => b.score - a.score);
+  }
+
+  function prepare(D) {
+    D.memIndex = {};
+    D.memories.forEach(m => { D.memIndex[m.id] = m; });
+    D.charIndex = {};
+    D.chars.forEach(c => { D.charIndex[c.id] = c; });
+    return D;
+  }
+
+  const api = { kind, group, GROUPS, fits, slotsOf, emptyBuild, canPlace, candidates, totals, show, specials,
+                gain, memValue, hungarian, recommend, score, rankCostumes, prepare };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.TL = api;
+})(this);
+
+</script>
+<script>
+// 画面。データは非公開リポの data.json を合言葉（トークン）で読み、端末に保存して次からはすぐ出す。
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const DATA = "mhaurt.data", CFG = "mhaurt.cfg", ST = "mhaurt.state", DEF_REPO = "kazuse429-eng/mhaur-tuning-data";
+  const RC = { "ストライク": "var(--st)", "アサルト": "var(--as)", "ラピッド": "var(--ra)", "テクニカル": "var(--te)", "サポート": "var(--su)" };
+  const RAR = { c: "C", r: "R", sr: "SR", ssr: "SSR" };
+  const esc = s => String(s).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
+  let D = null, st = loadJSON(ST, { char: "", cos: "", builds: {} }), cfg = loadJSON(CFG, {});
+  cfg.repo = cfg.repo || DEF_REPO;
+
+  function loadJSON(k, d) { try { return Object.assign(d, JSON.parse(localStorage.getItem(k) || "{}")); } catch (e) { return d; } }
+  const save = () => { try { localStorage.setItem(ST, JSON.stringify(st)); } catch (e) {} };
+
+  // ---------------- データ ----------------
+  function useData(obj) {
+    D = TL.prepare(obj);
+    $("noData").hidden = true; $("app").hidden = false;
+    $("ver").textContent = (D.version || "") + "・服" + D.costumes.length + "着";
+    fillChars(); render();
+  }
+  async function fetchData() {
+    if (!cfg.token) return false;
+    const r = await fetch("https://api.github.com/repos/" + cfg.repo + "/contents/data.json",
+      { headers: { Authorization: "Bearer " + cfg.token, Accept: "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28" }, cache: "no-store" });
+    if (!r.ok) throw new Error(r.status === 401 ? "合言葉が違うか期限切れです" : r.status === 404 ? "保存先が見つからないか、合言葉にその権限がありません" : "読み込み失敗 " + r.status);
+    const text = await r.text();
+    const obj = JSON.parse(text);
+    try { localStorage.setItem(DATA, text); } catch (e) {}
+    return obj;
+  }
+  async function boot() {
+    if (window.__DATA) { useData(window.__DATA); return; }          // 確認用ビルド
+    let cached = null;
+    try { cached = JSON.parse(localStorage.getItem(DATA) || "null"); } catch (e) {}
+    if (cached) useData(cached); else { $("noData").hidden = false; }
+    try {
+      const fresh = await fetchData();
+      if (fresh && (!cached || fresh.version !== cached.version || fresh.costumes.length !== cached.costumes.length)) useData(fresh);
+    } catch (e) { if (!cached) $("loadErr").textContent = e.message; }
+  }
+
+  // ---------------- 選択 ----------------
+  function fillChars() {
+    const have = new Set(D.costumes.map(c => c.char));
+    const chars = D.chars.filter(c => have.has(c.id));
+    if (!chars.some(c => c.id === st.char)) st.char = chars[0].id;
+    $("charSel").innerHTML = chars.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+    $("charSel").value = st.char;
+    fillCos();
+  }
+  function cosOf(charId) {
+    return D.costumes.filter(c => c.char === charId).sort((a, b) => b.ts - a.ts || a.id.localeCompare(b.id));
+  }
+  function fillCos() {
+    const list = cosOf(st.char);
+    if (!list.some(c => c.id === st.cos)) st.cos = list[0].id;
+    $("cosSel").innerHTML = list.map(c => `<option value="${c.id}">${esc(c.name)}（${RAR[c.rar] || c.rar}）${st.builds[c.id] && st.builds[c.id].n.some(Boolean) ? " ●" : ""}</option>`).join("");
+    $("cosSel").value = st.cos;
+  }
+  $("charSel").onchange = () => { st.char = $("charSel").value; fillCos(); save(); render(); };
+  $("cosSel").onchange = () => { st.cos = $("cosSel").value; save(); render(); };
+
+  const cos = () => D.costumes.find(c => c.id === st.cos);
+  function build() {
+    const c = cos();
+    let b = st.builds[c.id];
+    if (!b) b = TL.emptyBuild(c);
+    b.n = b.n.map(id => id && D.memIndex[id] ? id : null);        // データ更新で消えたメモリは外す
+    b.s = b.s.map(id => id && D.memIndex[id] ? id : null);
+    return b;
+  }
+  function setBuild(b) { st.builds[st.cos] = b; save(); fillCos(); render(); }
+  const memName = m => m.name + (m.style && m.style !== "オリジナル" ? "（" + m.style + "）" : "");
+  const slotLabel = s => s.role + (s.hv ? "·" + s.hv : "");
+
+  // ---------------- 描画 ----------------
+  function render() {
+    const c = cos(), b = build(), slots = TL.slotsOf(c), sps = TL.specials(D, c, b);
+    $("board").innerHTML = c.rows.map((r, ri) => {
+      const sp = sps[ri];
+      const tiles = slots.slice(ri * 5, ri * 5 + 5).map((s, k) => {
+        const i = ri * 5 + k, m = b.n[i] && D.memIndex[b.n[i]];
+        return `<button class="slot ${m ? "" : "empty"}" style="--rc:${RC[s.role]}" data-n="${i}">
+          <b>${s.no} ${s.hv ? `<span class="badge">${s.hv}</span>` : ""} Lv${s.lv}</b>
+          <span class="who">${m ? esc(memName(m)) : "空き"}</span></button>`;
+      }).join("");
+      return `<div class="row"><div class="rowh"><span>${ri ? "下段（スロット6〜10）" : "上段（スロット1〜5）"}</span><span>${sp.filled}/5 埋まり</span></div>
+        <button class="sp" style="--rc:${RC[r.sp.role]}" data-s="${ri}"><span class="t">スペシャル ${ri + 1}
+          <small>${esc(slotLabel(r.sp))} · Lv${sp.lv}${sp.lv < sp.max ? "（上限" + sp.max + "）" : ""}</small></span>
+          <span>${sp.mem ? esc(sp.mem.sp.name) : "<span class=off>空き</span>"} ${sp.mem ? (sp.active ? "<span class=on>発動</span>" : "<span class=off>未発動</span>") : ""}</span></button>
+        <div class="slots">${tiles}</div></div>`;
+    }).join("");
+    $("board").querySelectorAll("[data-n]").forEach(el => el.onclick = () => openPick("n", +el.dataset.n));
+    $("board").querySelectorAll("[data-s]").forEach(el => el.onclick = () => openPick("s", +el.dataset.s));
+
+    const tot = TL.totals(D, c, b);
+    if (!tot.length) $("res").innerHTML = `<p class="empty-msg">枠をタップしてメモリを付けると、ここに合計が出ます。</p>`;
+    else {
+      let h = "", g = -1;
+      tot.forEach(t => {
+        if (t.group !== g) { g = t.group; h += `<h3>${TL.GROUPS[g]}</h3>`; }
+        h += `<div class="ln"><span>${esc(t.skill.name)}${t.n > 1 ? ` <span class="badge">×${t.n}</span>` : ""}</span><span class="v${t.text.length > 12 ? " sm" : ""}">${esc(t.text)}</span></div>`;
+      });
+      $("res").innerHTML = h;
+    }
+    $("spRes").innerHTML = sps.map((s, ri) => {
+      if (!s.mem) return `<div class="ln"><span>スペシャル${ri + 1}</span><span class="off">空き</span></div>`;
+      const why = s.active ? "" : `（あと${5 - s.filled}枠埋めると発動）`;
+      return `<div class="ln" style="display:block"><div style="display:flex;justify-content:space-between;gap:8px"><span>${esc(s.mem.sp.name)} <span class="badge">Lv${s.lv}</span></span>
+        <span class="v">${s.active ? "値 " + esc(s.value) : "<span class=off>未発動</span>"}</span></div>
+        <div class="note" style="margin:2px 0">${esc(s.mem.sp.desc)}${s.mem.sp.up ? "／" + esc(s.mem.sp.up) : ""}${why}<br>${esc(memName(s.mem))}のメモリ</div></div>`;
+    }).join("");
+  }
+
+  // ---------------- 枠を選ぶ ----------------
+  function effLine(m, lv) {
+    return m.skills.map(sid => {
+      const sk = D.skills[sid], v = sk.lv[lv - 1];
+      return esc(sk.name) + " <em>" + esc(TL.show({ kind: TL.kind(sk), v })) + "</em>";
+    }).join(" ／ ");
+  }
+  function openPick(k, idx) {
+    const c = cos(), b = build();
+    const slot = k === "n" ? TL.slotsOf(c)[idx] : c.rows[idx].sp;
+    const cur = b[k][idx];
+    const lv = k === "n" ? slot.lv : (b.spLv[idx] || slot.lv);
+    $("pickTitle").textContent = (k === "n" ? "スロット" + slot.no : "スペシャル" + (idx + 1)) + "　" + slotLabel(slot) + "　Lv" + lv;
+    const list = TL.candidates(D, c, b, k, idx).sort((x, y) => (!!x.why - !!y.why) ||
+      (k === "n" ? TL.memValue(D, y.mem, lv, {}) - TL.memValue(D, x.mem, lv, {}) : 0));
+    let h = "";
+    if (k === "s") {
+      h += `<div class="lvs">スペシャルのLv <button id="lvDn">−</button><b>Lv${lv}</b><button id="lvUp">＋</button><span class="note" style="margin:0">上限${slot.lv}</span></div>`;
+    }
+    h += `<button class="cand" data-id="" style="--rc:#555">外す</button>`;
+    h += list.map(x => {
+      const m = x.mem;
+      const eff = k === "n" ? effLine(m, lv) : `${esc(m.sp.name)} <em>値 ${esc(m.sp.lv[lv - 1])}</em><br>${esc(m.sp.desc)}`;
+      return `<button class="cand ${m.id === cur ? "cur" : ""}" data-id="${m.id}" style="--rc:${RC[m.role]}" ${x.why ? "disabled" : ""}>
+        ${x.why ? `<span class="why">${esc(x.why)}</span>` : ""}${esc(memName(m))} <span class="badge">${m.hv}</span><span class="eff">${eff}</span></button>`;
+    }).join("");
+    if (!list.length) h += `<p class="empty-msg">この枠に入るメモリがありません。</p>`;
+    $("pickBody").innerHTML = h;
+    $("pickBody").querySelectorAll(".cand").forEach(el => el.onclick = () => {
+      const nb = JSON.parse(JSON.stringify(b)); nb[k][idx] = el.dataset.id || null;
+      $("pickDlg").close(); setBuild(nb);
+    });
+    if (k === "s") {
+      const step = d => { const nb = JSON.parse(JSON.stringify(b)); nb.spLv[idx] = Math.max(1, Math.min(slot.lv, lv + d)); setBuild(nb); openPick(k, idx); };
+      $("lvDn").onclick = () => step(-1); $("lvUp").onclick = () => step(1);
+    }
+    if (!$("pickDlg").open) $("pickDlg").showModal();
+  }
+  $("pickClose").onclick = () => $("pickDlg").close();
+
+  // ---------------- おすすめ ----------------
+  function openRec() {
+    const want = st.want || {};
+    const sk = Object.values(D.skills).sort((a, b) => TL.group(a) - TL.group(b) || Number(a.id.slice(1)) - Number(b.id.slice(1)));
+    let h = "", g = -1;
+    sk.forEach(s => {
+      if (TL.group(s) !== g) { g = TL.group(s); h += `<h4>${TL.GROUPS[g]}</h4>`; }
+      h += `<label><input type="checkbox" value="${s.id}" ${want[s.id] ? "checked" : ""}>${esc(s.name)}</label>`;
+    });
+    $("wantList").innerHTML = h;
+    $("keepMine").checked = !!st.keepMine;
+    $("rankList").innerHTML = "";
+    $("recDlg").showModal();
+  }
+  function readWant() {
+    const w = {};
+    $("wantList").querySelectorAll("input:checked").forEach(el => { w[el.value] = 1; });
+    st.want = w; st.keepMine = $("keepMine").checked; save();
+    if (!Object.keys(w).length) { $("rankList").innerHTML = `<p class="err">効果を1つ以上選んでください。</p>`; return null; }
+    return w;
+  }
+  function applyRec(c, nb) {
+    const old = st.builds[c.id];
+    if (old) { nb.s = old.s.slice(); nb.spLv = old.spLv.slice(); }
+    st.builds[c.id] = nb; st.cos = c.id; save(); fillCos(); render();
+  }
+  $("recBtn").onclick = openRec;
+  $("recClose").onclick = () => $("recDlg").close();
+  $("recHere").onclick = () => {
+    const w = readWant(); if (!w) return;
+    const c = cos(), b = build(), keep = {};
+    if (st.keepMine) b.n.forEach((id, i) => { if (id) keep[i] = id; });
+    applyRec(c, TL.recommend(D, c, w, keep).build);
+    $("recDlg").close();
+  };
+  $("recAll").onclick = () => {
+    const w = readWant(); if (!w) return;
+    const rk = TL.rankCostumes(D, st.char, w).slice(0, 10);
+    $("rankList").innerHTML = `<p class="note">欲しい効果が大きい順（上位10着）。タップでその服に付けます。</p>` + rk.map((r, i) => {
+      const t = TL.totals(D, r.costume, r.build).filter(x => w[x.skill.id]);
+      return `<button class="rank" data-i="${i}">${i + 1}. ${esc(r.costume.name)}（${RAR[r.costume.rar] || r.costume.rar}）
+        <small>${t.map(x => esc(x.skill.name) + " " + esc(x.text)).join("<br>") || "選んだ効果は付かない"}</small></button>`;
+    }).join("");
+    $("rankList").querySelectorAll(".rank").forEach(el => el.onclick = () => {
+      const r = rk[+el.dataset.i];
+      applyRec(r.costume, r.build); $("recDlg").close();
+    });
+  };
+  $("clearBtn").onclick = () => { const c = cos(); if (confirm("この服の枠を全部外しますか？")) setBuild(TL.emptyBuild(c)); };
+
+  // ---------------- 設定 ----------------
+  function openCfg() { $("cfgToken").value = cfg.token || ""; $("cfgRepo").value = cfg.repo; $("cfgErr").textContent = ""; $("cfg").showModal(); }
+  $("cfgBtn").onclick = openCfg; $("noDataBtn").onclick = openCfg;
+  $("cfgCancel").onclick = () => $("cfg").close();
+  $("cfgForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const token = $("cfgToken").value.trim(), repo = $("cfgRepo").value.trim() || DEF_REPO;
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { $("cfgErr").textContent = "保存先は「持ち主/リポジトリ名」の形で"; return; }
+    cfg = { token, repo }; localStorage.setItem(CFG, JSON.stringify(cfg));
+    $("cfgErr").textContent = "読み込み中…";
+    try { useData(await fetchData()); $("cfg").close(); }
+    catch (err) { $("cfgErr").textContent = err.message; }
+  });
+
+  boot();
+})();
+
+</script>
+<script>if('serviceWorker' in navigator && location.protocol.startsWith('http')){var hadSW=!!navigator.serviceWorker.controller,reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(hadSW&&!reloaded&&!document.querySelector('dialog[open]')){reloaded=true;location.reload();}});navigator.serviceWorker.register('sw.js').catch(function(){});}</script>
+</body>
+</html>
