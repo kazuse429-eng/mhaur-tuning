@@ -96,7 +96,7 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
     <div class="res" id="res"></div>
     <h2>スペシャル</h2>
     <div class="res" id="spRes"></div>
-    <p class="note">数値は各枠の上限Lv（無指定3／H・V指定4）で計算。攻撃・防御・速度・リロードは掛け算、HP・GP・ジャンプなどは足し算。スペシャルはその段の5枠が全部埋まったときだけ効く。同じキャラのメモリは1着に1つまで・本人のメモリは使えない。<br>データ: jp.ultrarumble.com（<span id="ver"></span>）</p>
+    <p class="note">数値は各枠の上限Lv（枠に表示のLv）で計算。攻撃・防御・速度・リロードは掛け算、HP・GP・ジャンプなどは足し算。スペシャルはその段の5枠が全部埋まったときだけ効く。同じキャラのメモリは1着に1つまで・本人のメモリは使えない。<br>データ: jp.ultrarumble.com（<span id="ver"></span>）</p>
   </div>
 </main>
 
@@ -124,7 +124,7 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
 <script>
 // チューニングの計算（画面に依存しない部分）。node の test_logic.cjs からも読む。
 // 数値の決まり（出典 jp.ultrarumble.com /tuning と tuning-builder の説明）
-//   通常枠の上限Lv：無指定=3、H/V指定=4
+//   通常枠の上限Lv：服ページの表記どおり（多くは無指定=3・H/V=4。無指定でLv4の服もある）
 //   重ね方：攻撃・防御・速度・リロード＝掛け算／最大HP・GP・瀕死HP・ジャンプ・PU/PC発動時間＝足し算
 //           PU/PCリロード＝それまでの値を2乗してから掛ける（Lv4×2 = 1.025²×1.025 = +7.69%）
 //   スペシャル：その行の通常枠5つが全部埋まっているときだけ効く
