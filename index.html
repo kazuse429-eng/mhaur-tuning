@@ -96,7 +96,7 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
     <div class="res" id="res"></div>
     <h2>スペシャル</h2>
     <div class="res" id="spRes"></div>
-    <p class="note">数値は各枠の上限Lv（枠に表示のLv）で計算。攻撃・防御・速度・リロードは掛け算、HP・GP・ジャンプなどは足し算。スペシャルはその段の5枠が全部埋まったときだけ効く。同じキャラのメモリは1着に1つまで・本人のメモリは使えない。<br>データ: jp.ultrarumble.com（<span id="ver"></span>）</p>
+    <p class="note">数値は各枠の上限Lv（枠に表示のLv）で計算。攻撃・防御・速度・リロードは掛け算、HP・GP・ジャンプなどは足し算。スペシャルはその段の5枠が全部埋まったときだけ効く。同じメモリは1着に1つまで（同じキャラの別スタイルは同時に付けられる）・本人のメモリは使えない。<br>データ: jp.ultrarumble.com（<span id="ver"></span>）</p>
   </div>
 </main>
 
@@ -120,7 +120,9 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
 //   重ね方：攻撃・防御・速度・リロード＝掛け算／最大HP・GP・瀕死HP・ジャンプ・PU/PC発動時間＝足し算
 //           PU/PCリロード＝それまでの値を2乗してから掛ける（Lv4×2 = 1.025²×1.025 = +7.69%）
 //   スペシャル：その行の通常枠5つが全部埋まっているときだけ効く
-//   同じキャラ（バトルスタイル違いを含む）のメモリは1着に1つまで。使っているキャラ自身のメモリは使えない
+//   同じメモリは1着に1つまで。同じキャラでもバトルスタイル違いのメモリは同時に付けられる
+//   （2026-11-15 ユーザー実機：トゥワイスの服にオーバーホールのオリジナル(サポート)と死穢ノ断崖(アサルト)を同時に付けられる）
+//   使っているキャラ自身のメモリは使えない（服はキャラ単位なので、スタイル違いも含めて除く）
 (function (root) {
   "use strict";
 
@@ -171,7 +173,7 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
     const list = build[kindKey];
     for (let i = 0; i < list.length; i++) {
       if (i === idx || !list[i]) continue;
-      if (D.memIndex[list[i]].char === mem.char) return "同じキャラを使用中";
+      if (list[i] === memId) return "別の枠で使用中";
     }
     return "";
   }
@@ -271,26 +273,18 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
   function recommend(D, costume, want, keep) {
     keep = keep || {};
     const slots = slotsOf(costume);
-    const usedChars = new Set(Object.values(keep).map(id => D.memIndex[id].char));
-    const chars = [...new Set(D.memories.map(m => m.char))].filter(c => c !== costume.char && !usedChars.has(c));
+    const used = new Set(Object.values(keep));
+    const mems = D.memories.filter(m => m.char !== costume.char && !used.has(m.id));
     const free = slots.map((s, i) => i).filter(i => !keep[i]);
     const build = emptyBuild(costume);
     Object.keys(keep).forEach(i => { build.n[i] = keep[i]; });
     if (!free.length) return { build, score: score(D, costume, build, want) };
-    // 列 = キャラ（1キャラ1枠）＋「空けておく」用のダミー列（行数ぶん）。セルの値 = そのキャラの、その枠で一番いいメモリ
-    const best = free.map(i => chars.map(c => {
-      let top = null, tv = -1;
-      D.memories.forEach(m => {
-        if (m.char !== c || !fits(m, slots[i], costume.char)) return;
-        const v = memValue(D, m, slots[i].lv, want);
-        if (v > tv) { tv = v; top = m; }
-      });
-      return top ? { id: top.id, v: tv } : null;
-    }));
+    // 列 = メモリ（1メモリ1枠）＋「空けておく」用のダミー列（行数ぶん）。セルの値 = そのメモリをその枠に付けたときの値
+    const best = free.map(i => mems.map(m => fits(m, slots[i], costume.char) ? memValue(D, m, slots[i].lv, want) : null));
     const BIG = 1e4;                          // 枠を埋めること自体を最優先（スペシャル発動のため）
-    const cost = best.map(row => row.map(x => x ? -(BIG + x.v) : 0).concat(free.map(() => 0)));
+    const cost = best.map(row => row.map(v => v === null ? 0 : -(BIG + v)).concat(free.map(() => 0)));
     const a = hungarian(cost);
-    free.forEach((slotIdx, r) => { const x = best[r][a[r]]; if (a[r] < chars.length && x) build.n[slotIdx] = x.id; });
+    free.forEach((slotIdx, r) => { if (a[r] < mems.length && best[r][a[r]] !== null) build.n[slotIdx] = mems[a[r]].id; });
     return { build, score: score(D, costume, build, want) };
   }
 
