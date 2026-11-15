@@ -75,11 +75,11 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
 .err{color:#ff8a8a;font-size:13px}
 </style>
 
-<header><h1>ヒロアカUR チューニング</h1><button class="icon" id="cfgBtn" aria-label="設定">⚙</button></header>
+<header><h1>ヒロアカUR チューニング</h1></header>
 <main>
   <div id="noData" hidden>
     <p>データがまだ読み込まれていません。</p>
-    <button class="pri" id="noDataBtn">合言葉を入れて読み込む</button>
+    <button class="pri" id="noDataBtn">もう一度読み込む</button>
     <p class="err" id="loadErr"></p>
   </div>
   <div id="app" hidden>
@@ -111,15 +111,7 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
   </div>
 </dialog>
 
-<dialog id="cfg"><div class="dh"><h3>データの読み込み</h3><button id="cfgCancel">閉じる</button></div>
-  <form class="db" id="cfgForm" method="dialog">
-    <p class="note" style="margin-top:4px">非公開リポのデータを読むための合言葉（GitHubのトークン）を入れてください。この端末にだけ保存されます。</p>
-    <p>合言葉<br><input type="password" id="cfgToken" autocomplete="off"></p>
-    <p>保存先<br><input type="text" id="cfgRepo"></p>
-    <p class="err" id="cfgErr"></p>
-    <div class="tools"><button class="pri" type="submit">保存して読み込む</button></div>
-  </form>
-</dialog>
+
 
 <script>
 // チューニングの計算（画面に依存しない部分）。node の test_logic.cjs からも読む。
@@ -333,16 +325,15 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
 
 </script>
 <script>
-// 画面。データは非公開リポの data.json を合言葉（トークン）で読み、端末に保存して次からはすぐ出す。
+// 画面。データは同じ公開ページの data.json を読み、端末に保存して次からはすぐ出す。
 (function () {
   "use strict";
   const $ = id => document.getElementById(id);
-  const DATA = "mhaurt.data", CFG = "mhaurt.cfg", ST = "mhaurt.state", DEF_REPO = "kazuse429-eng/mhaur-tuning-data";
+  const DATA = "mhaurt.data", ST = "mhaurt.state";
   const RC = { "ストライク": "var(--st)", "アサルト": "var(--as)", "ラピッド": "var(--ra)", "テクニカル": "var(--te)", "サポート": "var(--su)" };
   const RAR = { c: "C", r: "R", sr: "SR", ssr: "SSR" };
   const esc = s => String(s).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
-  let D = null, st = loadJSON(ST, { char: "", cos: "", builds: {} }), cfg = loadJSON(CFG, {});
-  cfg.repo = cfg.repo || DEF_REPO;
+  let D = null, st = loadJSON(ST, { char: "", cos: "", builds: {} });
 
   function loadJSON(k, d) { try { return Object.assign(d, JSON.parse(localStorage.getItem(k) || "{}")); } catch (e) { return d; } }
   const save = () => { try { localStorage.setItem(ST, JSON.stringify(st)); } catch (e) {} };
@@ -355,10 +346,8 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
     fillChars(); render();
   }
   async function fetchData() {
-    if (!cfg.token) return false;
-    const r = await fetch("https://api.github.com/repos/" + cfg.repo + "/contents/data.json",
-      { headers: { Authorization: "Bearer " + cfg.token, Accept: "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28" }, cache: "no-store" });
-    if (!r.ok) throw new Error(r.status === 401 ? "合言葉が違うか期限切れです" : r.status === 404 ? "保存先が見つからないか、合言葉にその権限がありません" : "読み込み失敗 " + r.status);
+    const r = await fetch("data.json", { cache: "no-cache" });       // 同じ公開ページに置いたデータ
+    if (!r.ok) throw new Error("データの読み込みに失敗しました（" + r.status + "）。通信できる所で開き直してください");
     const text = await r.text();
     const obj = JSON.parse(text);
     try { localStorage.setItem(DATA, text); } catch (e) {}
@@ -538,19 +527,7 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
   };
   $("clearBtn").onclick = () => { const c = cos(); if (confirm("この服の枠を全部外しますか？")) setBuild(TL.emptyBuild(c)); };
 
-  // ---------------- 設定 ----------------
-  function openCfg() { $("cfgToken").value = cfg.token || ""; $("cfgRepo").value = cfg.repo; $("cfgErr").textContent = ""; $("cfg").showModal(); }
-  $("cfgBtn").onclick = openCfg; $("noDataBtn").onclick = openCfg;
-  $("cfgCancel").onclick = () => $("cfg").close();
-  $("cfgForm").addEventListener("submit", async e => {
-    e.preventDefault();
-    const token = $("cfgToken").value.trim(), repo = $("cfgRepo").value.trim() || DEF_REPO;
-    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { $("cfgErr").textContent = "保存先は「持ち主/リポジトリ名」の形で"; return; }
-    cfg = { token, repo }; localStorage.setItem(CFG, JSON.stringify(cfg));
-    $("cfgErr").textContent = "読み込み中…";
-    try { useData(await fetchData()); $("cfg").close(); }
-    catch (err) { $("cfgErr").textContent = err.message; }
-  });
+  $("noDataBtn").onclick = () => location.reload();
 
   boot();
 })();
