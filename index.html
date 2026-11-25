@@ -87,9 +87,14 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
 #charNow img.big{width:52px;height:52px;border-radius:12px;object-fit:cover}
 #charNow b{font-size:13px;max-width:6em;line-height:1.2}
 .slot img.mf{width:34px;height:34px;border-radius:8px;object-fit:cover}
-.sp img.sf{width:34px;height:34px;border-radius:8px;object-fit:cover;flex:0 0 auto}
+.sp img.sf,.ln.spl img.sf{width:34px;height:34px;border-radius:8px;object-fit:cover;flex:0 0 auto}
 .cand img.cfc{float:left;width:44px;height:44px;border-radius:8px;object-fit:cover;margin:0 10px 0 0}
 .cand::after{content:"";display:block;clear:both}
+.badge.fx{background:#4a3a12;color:var(--acc)}
+.ln.spl{align-items:center}
+.ln.spl .nm{flex:1;min-width:0}
+.ln.spl small{display:block;font-size:11px;color:var(--sub)}
+.ln.spl .v{max-width:48%}
 </style>
 
 <header><h1>ヒロアカUR チューニング</h1></header>
@@ -202,16 +207,27 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
       .map(m => ({ mem: m, why: canPlace(D, costume, build, kindKey, idx, m.id) }));
   }
 
-  // 合計効果
+  // フィクサー（物間）: 発動中は同じ段の5枠の効果量を ×f。効果量＝基準からの差（+3% → +3%×f、受けるダメージ −2% → −2%×f）
+  const FIXER = "s10400";
+  function enhance(v, k, f) {
+    if (f === 1) return v;
+    if (k === "add") return v * f;
+    if (k === "def") return 1 - (1 - v) * f;
+    return 1 + (v - 1) * f;
+  }
+
+  // 合計効果（フィクサーは反映済み。a.fixer に倍率）
   function totals(D, costume, build) {
     const slots = slotsOf(costume);
     const acc = {};
+    const fx = specials(D, costume, build).map(s => s.active && s.mem.id === FIXER ? Number(s.value) || 1 : 1);
     build.n.forEach((id, i) => {
       if (!id) return;
-      const lv = slots[i].lv;
+      const lv = slots[i].lv, f = fx[slots[i].row];
       D.memIndex[id].skills.forEach(sid => {
-        const sk = D.skills[sid], v = sk.lv[lv - 1], k = kind(sk);
-        const a = acc[sid] || (acc[sid] = { skill: sk, kind: k, v: k === "add" ? 0 : 1, n: 0 });
+        const sk = D.skills[sid], k = kind(sk), v = enhance(sk.lv[lv - 1], k, f);
+        const a = acc[sid] || (acc[sid] = { skill: sk, kind: k, v: k === "add" ? 0 : 1, n: 0, fixer: 1 });
+        if (f !== 1) a.fixer = Math.max(a.fixer, f);
         if (k === "add") a.v += v;
         else if (k === "pu") a.v = a.v * a.v * v;
         else a.v *= v;
@@ -239,6 +255,54 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
       const lv = Math.min(build.spLv[ri] || r.sp.lv, r.sp.lv);
       return { row: ri, slot: r.sp, mem, lv, max: r.sp.lv, filled, active: !!mem && filled === 5,
                value: mem ? mem.sp.lv[lv - 1] : null };
+    });
+  }
+
+  // 発動中のスペシャルを「数値」として合計欄に出す。[効果, 条件]（数値はサイトの固定値。Lvで変わるのは時間・回数なので別に出す）
+  const SP_FX = {
+    s20200: ["移動速度・攻撃速度 ×1.2", "格闘ヒット後 30秒"],
+    s20201: ["HP半分以下で受けるダメージ −40%", "ガードブレイクされた後 10秒（ひるまない）"],
+    s300: ["移動速度 ×1.2・壁走り", "ガードブレイクされた後"],
+    s4600: ["受けるダメージ −30%", "格闘ヒット後 10秒"],
+    s4601: ["攻撃力 +5%", "格闘ヒット後 10秒"],
+    s10901: ["攻撃力 +20%", "味方がガードブレイクされた後 7秒"],
+    s2300: ["PU/PC中の攻撃力 ×1.5（通常×1.2）", "PU/PC発動時間は短くなる"],
+    s2301: ["PU/PC発動時間が伸びる", "常時"],
+    s10000: ["受けるダメージ −20%", "ガードブレイクされた後"],
+    s1500: ["攻撃力 +10%", "ガードブレイクされた後"],
+    s1501: ["相手の受けるダメージ +10%", "格闘ヒットした相手に 10秒"],
+    s20100: ["リロード速度 ×2", "ガードブレイクした後 10秒"],
+    s1700: ["リロード速度 ×1.5", "ガードブレイクされた後"],
+    s1600: ["特殊アクションのリロード速度 ×5", "敵をDOWNさせた後"],
+    s11500: ["“個性”技αのリロード速度 ×10", "αで敵をDOWNさせた後"],
+    s1300: ["GP回復アイテムの使用時間 −30%", "バトル開始から"],
+    s1301: ["HP回復アイテムの使用時間 −30%", "バトル開始から"],
+    s11400: ["セーフエリア外のダメージ −50%", "バトル開始から"],
+    s100: ["市民の救助/脅しの時間 −80%", "バトル開始から"],
+    s10200: ["アイテムボックス(大)の開封時間 −80%", "バトル開始から"],
+    s20300: ["瀕死中の移動速度 ×2.5・瀕死HP増", "1試合2回まで"],
+    s11100: ["受け身の速度 ×1.8（空中×2.6）", "バトル開始から"],
+    s400: ["燃焼の時間 ×0.01", "再発動まで待ちあり"],
+    s401: ["凍りの時間 ×0.1", "再発動まで待ちあり"],
+    s700: ["痺れの時間 ×0.1", "再発動まで待ちあり"],
+  };
+  // Lvで変わる値の読み方（説明文の「レベルアップで○○」から）
+  function lvText(mem, v) {
+    const up = mem.sp.up || "";
+    if (mem.id === "s1200") return "開始時ゲージ +" + Math.round(Number(v) * 100) + "%";
+    if (mem.id === FIXER) return "効果量 ×" + v;
+    if (/再発動/.test(up)) return "再発動まで " + v + "秒";
+    if (/効果時間|発動時間/.test(up)) return "効果 " + v + "秒";
+    if (/回復量/.test(up)) return "回復 " + v;
+    if (/確率/.test(up)) return "確率 " + v + "%";
+    if (/回数/.test(up)) return "上限 " + v + "回";
+    return "Lv値 " + v;
+  }
+  function spLines(D, costume, build) {
+    return specials(D, costume, build).filter(s => s.active).map(s => {
+      const fx = s.mem.id === FIXER ? ["同じ段のチューニング効果を強化", "上の合計に反映済み"] : SP_FX[s.mem.id];
+      return { row: s.row, mem: s.mem, lv: s.lv, name: s.mem.sp.name,
+               effect: fx ? fx[0] : s.mem.sp.desc, cond: fx ? fx[1] : "", lvText: lvText(s.mem, s.value) };
     });
   }
 
@@ -329,7 +393,7 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
     return D;
   }
 
-  const api = { kind, group, GROUPS, fits, slotsOf, emptyBuild, canPlace, candidates, totals, show, specials,
+  const api = { kind, group, GROUPS, fits, slotsOf, emptyBuild, canPlace, candidates, totals, show, specials, spLines, enhance, FIXER,
                 gain, memValue, hungarian, recommend, score, rankCostumes, prepare };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.TL = api;
@@ -485,14 +549,22 @@ const TC = (() => {
     $("board").querySelectorAll("[data-n]").forEach(el => el.onclick = () => openPick("n", +el.dataset.n));
     $("board").querySelectorAll("[data-s]").forEach(el => el.onclick = () => openPick("s", +el.dataset.s));
 
-    const tot = TL.totals(D, c, b);
-    if (!tot.length) $("res").innerHTML = `<p class="empty-msg">枠をタップしてメモリを付けると、ここに合計が出ます。</p>`;
+    const tot = TL.totals(D, c, b), spl = TL.spLines(D, c, b);
+    if (!tot.length && !spl.length) $("res").innerHTML = `<p class="empty-msg">枠をタップしてメモリを付けると、ここに合計が出ます。</p>`;
     else {
       let h = "", g = -1;
       tot.forEach(t => {
         if (t.group !== g) { g = t.group; h += `<h3>${TL.GROUPS[g]}</h3>`; }
-        h += `<div class="ln"><span>${esc(t.skill.name)}${t.n > 1 ? ` <span class="badge">×${t.n}</span>` : ""}</span><span class="v${t.text.length > 12 ? " sm" : ""}">${esc(t.text)}</span></div>`;
+        h += `<div class="ln"><span>${esc(t.skill.name)}${t.n > 1 ? ` <span class="badge">×${t.n}</span>` : ""}${t.fixer > 1 ? ` <span class="badge fx">フィクサー×${t.fixer}込み</span>` : ""}</span><span class="v${t.text.length > 12 ? " sm" : ""}">${esc(t.text)}</span></div>`;
       });
+      // 発動中のスペシャル（段の5枠が埋まっているもの）。条件つきの効果なので上の合計とは分けて出す
+      if (spl.length) {
+        h += `<h3>スペシャル（発動中）</h3>`;
+        spl.forEach(s => {
+          h += `<div class="ln spl">${face("mem", s.mem.id, "sf")}<span class="nm">${esc(s.name)} <span class="badge">Lv${s.lv}</span>
+            <small>${esc(s.cond)}${s.cond ? "・" : ""}${esc(s.lvText)}</small></span><span class="v sm">${esc(s.effect)}</span></div>`;
+        });
+      }
       $("res").innerHTML = h;
     }
     $("spRes").innerHTML = sps.map((s, ri) => {
