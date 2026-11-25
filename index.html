@@ -73,6 +73,23 @@ dialog::backdrop{background:#000a}
 input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:#11141b;color:var(--tx)}
 .lvs{display:flex;align-items:center;gap:8px;margin:8px 0}
 .err{color:#ff8a8a;font-size:13px}
+[hidden]{display:none!important}
+/* キャラの顔（リンク限定版だけ。顔が無ければ今までの文字表示） */
+.cg{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 6px;scroll-snap-type:x proximity;scrollbar-width:thin}
+.cg .cf{flex:0 0 auto;width:58px;height:58px;padding:0;border-radius:12px;overflow:hidden;border:2px solid transparent;background:#11141b;scroll-snap-align:center;opacity:.6}
+.cg .cf.on{border-color:var(--acc);opacity:1}
+.cg .cf img{width:100%;height:100%;object-fit:cover;display:block}
+.cg .cf span{font-size:10px;padding:2px}
+.now{display:flex;align-items:center;gap:10px}
+.now select{flex:1;min-width:0}
+#charNow{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+#charNow:empty{display:none}
+#charNow img.big{width:52px;height:52px;border-radius:12px;object-fit:cover}
+#charNow b{font-size:13px;max-width:6em;line-height:1.2}
+.slot img.mf{width:34px;height:34px;border-radius:8px;object-fit:cover}
+.sp img.sf{width:34px;height:34px;border-radius:8px;object-fit:cover;flex:0 0 auto}
+.cand img.cfc{float:left;width:44px;height:44px;border-radius:8px;object-fit:cover;margin:0 10px 0 0}
+.cand::after{content:"";display:block;clear:both}
 </style>
 
 <header><h1>ヒロアカUR チューニング</h1></header>
@@ -84,8 +101,9 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
   </div>
   <div id="app" hidden>
     <div class="pick">
+      <div id="charGrid" class="cg" hidden></div>
       <select id="charSel" aria-label="キャラ"></select>
-      <select id="cosSel" aria-label="服"></select>
+      <div class="now"><span id="charNow"></span><select id="cosSel" aria-label="服"></select></div>
     </div>
     <div id="board"></div>
     <div class="tools">
@@ -96,7 +114,7 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
     <div class="res" id="res"></div>
     <h2>スペシャル</h2>
     <div class="res" id="spRes"></div>
-    <p class="note">数値は各枠の上限Lv（枠に表示のLv）で計算。攻撃・防御・速度・リロードは掛け算、HP・GP・ジャンプなどは足し算。スペシャルはその段の5枠が全部埋まったときだけ効く。同じメモリは1着に1つまで（同じキャラの別スタイルは同時に付けられる）・本人のメモリは使えない。<br>データ: jp.ultrarumble.com（<span id="ver"></span>）</p>
+    <p class="note">キャラの画像は公式（自分の端末で見る用。リンクは人に送らない）。数値は各枠の上限Lv（枠に表示のLv）で計算。攻撃・防御・速度・リロードは掛け算、HP・GP・ジャンプなどは足し算。スペシャルはその段の5枠が全部埋まったときだけ効く。同じメモリは1着に1つまで（同じキャラの別スタイルは同時に付けられる）・本人のメモリは使えない。<br>データ: jp.ultrarumble.com（<span id="ver"></span>）</p>
   </div>
 </main>
 
@@ -317,6 +335,32 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
   else root.TL = api;
 })(this);
 
+// 暗号文 d.bin の復号（share.py の encrypt と対）。check.py も同じものを Node で試す。
+// 鍵はリンクの #k=… で受け取り、端末に覚えてアドレス欄からは消す。
+const TC = (() => {
+  const KEY = "mhaurt.k";
+  function b64url(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    return Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  }
+  async function decryptBlob(keyText, buf) {
+    const key = await crypto.subtle.importKey("raw", b64url(keyText), "AES-GCM", false, ["decrypt"]);
+    const b = new Uint8Array(buf);
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b.slice(0, 12) }, key, b.slice(12));
+    return new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+  }
+  function takeKey() {        // #k=… があれば覚えて消す。覚えている鍵を返す（無ければ null）
+    const m = /[#&]k=([A-Za-z0-9_-]{43})/.exec(location.hash);
+    if (m) {
+      try { localStorage.setItem(KEY, m[1]); } catch (e) {}
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+    try { return localStorage.getItem(KEY); } catch (e) { return m ? m[1] : null; }
+  }
+  return { decryptBlob, takeKey };
+})();
+
 </script>
 <script>
 // 画面。データは同じ公開ページの data.json を読み、端末に保存して次からはすぐ出す。
@@ -333,30 +377,42 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
   const save = () => { try { localStorage.setItem(ST, JSON.stringify(st)); } catch (e) {} };
 
   // ---------------- データ ----------------
+  // 公開ページには暗号文 d.bin だけを置く（データ＋キャラの顔）。鍵はリンクの #k=…（crypt.js）
+  let FACE = { char: {}, mem: {} };
   function useData(obj) {
+    FACE = obj.faces || { char: {}, mem: {} };
     D = TL.prepare(obj);
     $("noData").hidden = true; $("app").hidden = false;
     $("ver").textContent = (D.version || "") + "・服" + D.costumes.length + "着";
     fillChars(); render();
   }
-  async function fetchData() {
-    const r = await fetch("data.json", { cache: "no-cache" });       // 同じ公開ページに置いたデータ
+  async function fetchData(key) {
+    const r = await fetch("d.bin", { cache: "no-cache" });
     if (!r.ok) throw new Error("データの読み込みに失敗しました（" + r.status + "）。通信できる所で開き直してください");
-    const text = await r.text();
+    let text;
+    try { text = await TC.decryptBlob(key, await r.arrayBuffer()); }
+    catch (e) { throw new Error("鍵が合いません。新しいリンクから開き直してください"); }
     const obj = JSON.parse(text);
     try { localStorage.setItem(DATA, text); } catch (e) {}
     return obj;
   }
   async function boot() {
-    if (window.__DATA) { useData(window.__DATA); return; }          // 確認用ビルド
+    if (window.__DATA) { useData(window.__DATA); return; }          // 確認用ビルド・デスクトップの1枚版
+    const key = TC.takeKey();
     let cached = null;
     try { cached = JSON.parse(localStorage.getItem(DATA) || "null"); } catch (e) {}
-    if (cached) useData(cached); else { $("noData").hidden = false; }
+    if (!key) {
+      $("noData").hidden = false; $("noDataBtn").hidden = true;
+      $("loadErr").textContent = "このページは、送られたリンクから開いてください。"; return;
+    }
+    if (cached && cached.faces) useData(cached); else { cached = null; $("noData").hidden = false; }
     try {
-      const fresh = await fetchData();
-      if (fresh && (!cached || fresh.version !== cached.version || fresh.costumes.length !== cached.costumes.length)) useData(fresh);
+      const fresh = await fetchData(key);
+      if (fresh && (!cached || fresh.version !== cached.version || fresh.costumes.length !== cached.costumes.length
+                    || Object.keys(fresh.faces || {}).length !== Object.keys(cached.faces || {}).length)) useData(fresh);
     } catch (e) { if (!cached) $("loadErr").textContent = e.message; }
   }
+  const face = (kind, id, cls) => FACE[kind][id] ? `<img class="${cls}" src="${FACE[kind][id]}" alt="">` : "";
 
   // ---------------- 選択 ----------------
   function fillChars() {
@@ -365,7 +421,22 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
     if (!chars.some(c => c.id === st.char)) st.char = chars[0].id;
     $("charSel").innerHTML = chars.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
     $("charSel").value = st.char;
+    // 顔があれば顔で選ぶ（select は顔が無いときの予備）
+    const withFace = chars.some(c => FACE.char[c.id]);
+    $("charGrid").hidden = !withFace; $("charSel").hidden = withFace;
+    if (withFace) {
+      $("charGrid").innerHTML = chars.map(c => `<button class="cf${c.id === st.char ? " on" : ""}" data-c="${c.id}" title="${esc(c.name)}">
+        ${face("char", c.id, "") || `<span>${esc(c.name)}</span>`}</button>`).join("");
+      $("charGrid").querySelectorAll("[data-c]").forEach(el => el.onclick = () => pickChar(el.dataset.c));
+      const on = $("charGrid").querySelector(".on");
+      if (on) on.scrollIntoView({ block: "nearest", inline: "center" });
+    }
     fillCos();
+  }
+  function pickChar(id) {
+    st.char = id; $("charSel").value = id;
+    $("charGrid").querySelectorAll(".cf").forEach(el => el.classList.toggle("on", el.dataset.c === id));
+    fillCos(); save(); render();
   }
   function cosOf(charId) {
     return D.costumes.filter(c => c.char === charId).sort((a, b) => b.ts - a.ts || a.id.localeCompare(b.id));
@@ -375,8 +446,10 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
     if (!list.some(c => c.id === st.cos)) st.cos = list[0].id;
     $("cosSel").innerHTML = list.map(c => `<option value="${c.id}">${esc(c.name)}（${RAR[c.rar] || c.rar}）${st.builds[c.id] && st.builds[c.id].n.some(Boolean) ? " ●" : ""}</option>`).join("");
     $("cosSel").value = st.cos;
+    const ch = D.chars.find(c => c.id === st.char);
+    $("charNow").innerHTML = face("char", st.char, "big") + `<b>${esc(ch ? ch.name : "")}</b>`;
   }
-  $("charSel").onchange = () => { st.char = $("charSel").value; fillCos(); save(); render(); };
+  $("charSel").onchange = () => pickChar($("charSel").value);
   $("cosSel").onchange = () => { st.cos = $("cosSel").value; save(); render(); };
 
   const cos = () => D.costumes.find(c => c.id === st.cos);
@@ -401,10 +474,10 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
         const i = ri * 5 + k, m = b.n[i] && D.memIndex[b.n[i]];
         return `<button class="slot ${m ? "" : "empty"}" style="--rc:${RC[s.role]}" data-n="${i}">
           <b>${s.no} ${s.hv ? `<span class="badge">${s.hv}</span>` : ""} Lv${s.lv}</b>
-          <span class="who">${m ? esc(memName(m)) : "空き"}</span></button>`;
+          ${m ? face("mem", m.id, "mf") : ""}<span class="who">${m ? esc(memName(m)) : "空き"}</span></button>`;
       }).join("");
       return `<div class="row"><div class="rowh"><span>${ri ? "下段（スロット6〜10）" : "上段（スロット1〜5）"}</span><span>${sp.filled}/5 埋まり</span></div>
-        <button class="sp" style="--rc:${RC[r.sp.role]}" data-s="${ri}"><span class="t">スペシャル ${ri + 1}
+        <button class="sp" style="--rc:${RC[r.sp.role]}" data-s="${ri}">${sp.mem ? face("mem", sp.mem.id, "sf") : ""}<span class="t">スペシャル ${ri + 1}
           <small>${esc(slotLabel(r.sp))} · Lv${sp.lv}${sp.lv < sp.max ? "（上限" + sp.max + "）" : ""}</small></span>
           <span>${sp.mem ? esc(sp.mem.sp.name) : "<span class=off>空き</span>"} ${sp.mem ? (sp.active ? "<span class=on>発動</span>" : "<span class=off>未発動</span>") : ""}</span></button>
         <div class="slots">${tiles}</div></div>`;
@@ -455,7 +528,7 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
       const m = x.mem;
       const eff = k === "n" ? effLine(m, lv) : `${esc(m.sp.name)} <em>値 ${esc(m.sp.lv[lv - 1])}</em><br>${esc(m.sp.desc)}`;
       return `<button class="cand ${m.id === cur ? "cur" : ""}" data-id="${m.id}" style="--rc:${RC[m.role]}" ${x.why ? "disabled" : ""}>
-        ${x.why ? `<span class="why">${esc(x.why)}</span>` : ""}${esc(memName(m))} <span class="badge">${m.hv}</span><span class="eff">${eff}</span></button>`;
+        ${face("mem", m.id, "cfc")}${x.why ? `<span class="why">${esc(x.why)}</span>` : ""}${esc(memName(m))} <span class="badge">${m.hv}</span><span class="eff">${eff}</span></button>`;
     }).join("");
     if (!list.length) h += `<p class="empty-msg">この枠に入るメモリがありません。</p>`;
     $("pickBody").innerHTML = h;
