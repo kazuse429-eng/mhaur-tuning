@@ -302,7 +302,7 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
     return specials(D, costume, build).filter(s => s.active).map(s => {
       const fx = s.mem.id === FIXER ? ["同じ段のチューニング効果を強化", "上の合計に反映済み"] : SP_FX[s.mem.id];
       return { row: s.row, mem: s.mem, lv: s.lv, name: s.mem.sp.name,
-               effect: fx ? fx[0] : s.mem.sp.desc, cond: fx ? fx[1] : "", lvText: lvText(s.mem, s.value) };
+               effect: fx ? fx[0] : (s.mem.sp.desc || "効果はまだ公開されていない"), cond: fx ? fx[1] : "", lvText: lvText(s.mem, s.value) };
     });
   }
 

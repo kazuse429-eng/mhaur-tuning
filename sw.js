@@ -1,6 +1,6 @@
 // オフライン用: 初回に全ファイルを保存し、以後は保存分を表示する。
 // 版(VERSION)は build.py が中身のハッシュで埋める。新しい版を公開すると、次に開いたとき裏で入れ替わる。
-const VERSION = "1554c7463ce3";
+const VERSION = "3b8e08d428e7";
 const CACHE = "mhaurt-" + VERSION;
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png"];
 
