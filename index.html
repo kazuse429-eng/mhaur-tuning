@@ -90,6 +90,19 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
 .sp img.sf,.ln.spl img.sf{width:34px;height:34px;border-radius:8px;object-fit:cover;flex:0 0 auto}
 .cand img.cfc{float:left;width:44px;height:44px;border-radius:8px;object-fit:cover;margin:0 10px 0 0}
 .cand::after{content:"";display:block;clear:both}
+/* 服の絵（小さい絵の横並び・選んだ服の大きい絵） */
+.ctg{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:thin}
+.ct{position:relative;flex:0 0 auto;width:66px;height:66px;padding:0;border-radius:10px;overflow:hidden;border:2px solid var(--rr,#555);background:#11141b;opacity:.65}
+.ct.on{opacity:1;outline:2px solid var(--acc);outline-offset:1px}
+.ct img{width:100%;height:100%;object-fit:cover;display:block}
+.ct span{display:block;font-size:9px;line-height:1.15;padding:3px;max-height:100%;overflow:hidden}
+.ct.img span{display:none}
+.ct i{position:absolute;right:3px;top:1px;font-style:normal;font-size:10px;color:var(--acc)}
+.ct.r-c{--rr:#8a8f9c}.ct.r-r{--rr:#3d8bff}.ct.r-sr{--rr:#c56bff}.ct.r-ssr{--rr:#ffb020}
+.art{position:relative;margin:0 0 10px;border-radius:14px;overflow:hidden;background:radial-gradient(#2a2f3c,#11141b);text-align:center}
+.art img{display:block;margin:0 auto;height:260px;width:auto;max-width:100%;object-fit:contain}
+.art span{position:absolute;left:0;right:0;bottom:0;padding:16px 12px 8px;background:linear-gradient(transparent,#000c);text-align:left;font-weight:700;font-size:14px}
+.art small{margin-left:8px;font-size:11px;color:var(--acc)}
 .badge.fx{background:#4a3a12;color:var(--acc)}
 .ln.spl{align-items:center}
 .ln.spl .nm{flex:1;min-width:0}
@@ -109,7 +122,9 @@ input[type=text],input[type=password]{font:inherit;width:100%;padding:10px;borde
       <div id="charGrid" class="cg" hidden></div>
       <select id="charSel" aria-label="キャラ"></select>
       <div class="now"><span id="charNow"></span><select id="cosSel" aria-label="服"></select></div>
+      <div id="cosGrid" class="ctg" hidden></div>
     </div>
+    <div id="cosArt" class="art" hidden></div>
     <div id="board"></div>
     <div class="tools">
       <button class="pri" id="recBtn">おすすめで埋める</button>
@@ -461,8 +476,9 @@ const TC = (() => {
     return obj;
   }
   async function boot() {
-    if (window.__DATA) { useData(window.__DATA); return; }          // 確認用ビルド・デスクトップの1枚版
+    if (window.__DATA) { KEY = window.__ART_KEY || null; useData(window.__DATA); return; }   // 確認用ビルド・デスクトップの1枚版
     const key = TC.takeKey();
+    KEY = key;
     let cached = null;
     try { cached = JSON.parse(localStorage.getItem(DATA) || "null"); } catch (e) {}
     if (!key) {
@@ -476,6 +492,23 @@ const TC = (() => {
                     || Object.keys(fresh.faces || {}).length !== Object.keys(cached.faces || {}).length)) useData(fresh);
     } catch (e) { if (!cached) $("loadErr").textContent = e.message; }
   }
+  // 服の絵：キャラごとの小さい絵 art/{キャラ}_s.bin、服ごとの大きい絵 art/l/{服}.bin（どちらも暗号文。読んだら覚えておく）
+  let KEY = null;
+  const ART_BASE = window.__ART_BASE || "";
+  let keyTag = null;      // 鍵のハッシュ先頭8桁（鍵そのものは送らない）。鍵を替えたら端末に残った古い暗号文を使わないため
+  async function getBin(path) {
+    if (!KEY) return null;
+    try {
+      if (!keyTag) keyTag = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(KEY)))]
+        .slice(0, 4).map(b => b.toString(16).padStart(2, "0")).join("");
+      const r = await fetch(ART_BASE + path + "?k=" + keyTag);
+      if (!r.ok) return null;                                       // 絵が無い服は 404 → 顔のまま
+      return JSON.parse(await TC.decryptBlob(KEY, await r.arrayBuffer()));
+    } catch (e) { return null; }
+  }
+  const artS = {}, artL = {};
+  const charArt = ch => artS[ch] || (artS[ch] = getBin("art/" + ch + "_s.bin").then(m => m || {}));
+  const bigArt = id => artL[id] || (artL[id] = getBin("art/l/" + id + ".bin"));
   const face = (kind, id, cls) => FACE[kind][id] ? `<img class="${cls}" src="${FACE[kind][id]}" alt="">` : "";
 
   // ---------------- 選択 ----------------
@@ -512,9 +545,43 @@ const TC = (() => {
     $("cosSel").value = st.cos;
     const ch = D.chars.find(c => c.id === st.char);
     $("charNow").innerHTML = face("char", st.char, "big") + `<b>${esc(ch ? ch.name : "")}</b>`;
+    // 服の絵の一覧（絵が届いたら差し込む。届く前・絵が無い服は名前の札）
+    const charId = st.char;
+    $("cosGrid").hidden = !KEY;
+    $("cosGrid").innerHTML = list.map(c => `<button class="ct r-${c.rar}${c.id === st.cos ? " on" : ""}" data-co="${c.id}" title="${esc(c.name)}">
+      <span>${esc(c.name)}</span>${st.builds[c.id] && st.builds[c.id].n.some(Boolean) ? "<i>●</i>" : ""}</button>`).join("");
+    $("cosGrid").querySelectorAll("[data-co]").forEach(el => el.onclick = () => pickCos(el.dataset.co));
+    if (KEY) charArt(charId).then(m => {
+      if (st.char !== charId) return;
+      $("cosGrid").querySelectorAll("[data-co]").forEach(el => {
+        const u = m[el.dataset.co];
+        if (u && !el.querySelector("img")) { el.insertAdjacentHTML("afterbegin", `<img src="${u}" alt="">`); el.classList.add("img"); }
+      });
+      const on = $("cosGrid").querySelector(".on");
+      if (on) on.scrollIntoView({ block: "nearest", inline: "center" });
+    });
+  }
+  function pickCos(id) {
+    st.cos = id; $("cosSel").value = id;
+    $("cosGrid").querySelectorAll(".ct").forEach(el => el.classList.toggle("on", el.dataset.co === id));
+    save(); render();
+  }
+  // 選んだ服の大きい絵（服が替わったときだけ読み直す）
+  let bigFor = null;
+  function showBig() {
+    const id = st.cos;
+    if (id === bigFor) return;
+    bigFor = id; $("cosArt").hidden = true;
+    if (!KEY) return;
+    bigArt(id).then(u => {
+      if (st.cos !== id || !u) return;
+      const c = cos();
+      $("cosArt").innerHTML = `<img src="${u}" alt=""><span>${esc(c.name)}<small>${RAR[c.rar] || c.rar}</small></span>`;
+      $("cosArt").hidden = false;
+    });
   }
   $("charSel").onchange = () => pickChar($("charSel").value);
-  $("cosSel").onchange = () => { st.cos = $("cosSel").value; save(); render(); };
+  $("cosSel").onchange = () => pickCos($("cosSel").value);
 
   const cos = () => D.costumes.find(c => c.id === st.cos);
   function build() {
@@ -532,6 +599,7 @@ const TC = (() => {
   // ---------------- 描画 ----------------
   function render() {
     const c = cos(), b = build(), slots = TL.slotsOf(c), sps = TL.specials(D, c, b);
+    showBig();
     $("board").innerHTML = c.rows.map((r, ri) => {
       const sp = sps[ri];
       const tiles = slots.slice(ri * 5, ri * 5 + 5).map((s, k) => {
